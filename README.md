@@ -64,13 +64,14 @@ In this project we have used 2 pipelines to ingest, process and prepare business
 
     ![pl_staging_nyctaxi_processing_pipeline](screenshots/pl_staging_nyctaxi_processing_pipeline.png)
     #### **Pipeline Components:**
-     Script Activity : Latest Processed Data
-       ```sql
-         select top 1 
-  			latest_processed_pickup 
-  			from metadata.processing_log
-  			where table_processed = 'staging.NYCTaxi_yellow'
-  			order by latest_processed_pickup desc; 
+     **Script Activity : Latest Processed Data** 
+   
+        select top 1 
+            latest_processed_pickup 
+            from metadata.processing_log 
+            where table_processed = 'staging.NYCTaxi_yellow' 
+            order by latest_processed_pickup desc;
+   
 
  
 

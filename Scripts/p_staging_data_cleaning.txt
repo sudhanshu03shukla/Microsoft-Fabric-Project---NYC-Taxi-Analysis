@@ -1,0 +1,7 @@
+CREATE OR ALTER procedure staging.p_staging_data_cleaning
+		@start_date datetime2,
+		@end_date datetime2
+		AS 
+
+		DELETE from staging.NYCTaxi_yellow 
+			where tpep_dropoff_datetime < @start_date or tpep_pickup_datetime > @end_date;

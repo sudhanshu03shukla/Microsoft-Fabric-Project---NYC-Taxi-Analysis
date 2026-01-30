@@ -50,21 +50,26 @@ In this project we have used 2 pipelines to ingest, process and prepare business
 5. Upload taxi_zone_lookup.csv files in NYCTaxi_Lookup_Zone folder.
 6. Create a warehouse to host staging schema : NYCTaxi_Warehouse.
 7. Now we will start working on our first pipeline to ingest data and store in NYCTaxi_Warehouse.
-   ### **Pipeline 1:**
-     #### **pl_staging_zone_lookup_pipeline :**
+
+### **Pipeline 1:**
+#### **pl_staging_zone_lookup_pipeline :**
 
    ![pl_staging_zone_lookup_pipeline](screenshots/pl_staging_zone_lookup_pipeline.png) 
-     #### **Pipeline Components:**
-       Copy Activity: Copy Taxi Zone Lookup Table \
-       Source: NYCTaxiLakehouse/NYCTaxi_Lookup_Zone/taxi_zone_lookup.csv \
-       Destination: NYCTaxi_Warehouse.staging.taxi_zone_lookup (new table) \
-8. Start working on our sesond pipeline to ingest data in NYCTaxi_Warehouse, stagin schema.
-    ### **Pipeline 2:**
-     #### **pl_staging_nyctaxi_processing_pipeline :**
+     
+#### **Pipeline Components:**
+* Copy Activity: Copy Taxi Zone Lookup Table \
+  Source: NYCTaxiLakehouse/NYCTaxi_Lookup_Zone/taxi_zone_lookup.csv \
+  Destination: NYCTaxi_Warehouse.staging.taxi_zone_lookup (new table) \
+
+Start working on our sesond pipeline to ingest data in NYCTaxi_Warehouse, staging schema.
+
+### **Pipeline 2:**
+#### **pl_staging_nyctaxi_processing_pipeline :**
 
     ![pl_staging_nyctaxi_processing_pipeline](screenshots/pl_staging_nyctaxi_processing_pipeline.png)
-    #### **Pipeline Components:**
-     **Script Activity : Latest Processed Data** 
+	
+#### **Pipeline Components:**
+**Script Activity : Latest Processed Data** 
    
         select top 1 
             latest_processed_pickup 
@@ -72,7 +77,7 @@ In this project we have used 2 pipelines to ingest, process and prepare business
             where table_processed = 'staging.NYCTaxi_yellow' 
             order by latest_processed_pickup desc;
 
-   **Set Variable Activity :** v_date
+**Set Variable Activity :** v_date
 
            @formatDateTime(
     					addToTime(
@@ -80,68 +85,69 @@ In this project we have used 2 pipelines to ingest, process and prepare business
         				1, 'Month'), 
     				'yyyy-MM')
 
-   **Copy Activity :**\
-           Copy NYCTaxi Data to staging
-        		Source : NYCTaxiLakehouse/NYCTaxi_Yellow/@concat('yellow_tripdata_',variables('v_date'),'.parquet')\
-        		Destination : NYCTaxi_Warehouse.staging.NYCTaxi_yellow (existing table)
+**Copy Activity :**\
+Copy NYCTaxi Data to staging
 
-   **Stored Procedure Activity :** SP for removing outlier date
-	    Stored Procedure name : NYCTaxi_Warehouse.staging.p_staging_data_cleaning
-	    (this Stored procedure is created to clean the data, as we found that there are some outlier date data present in each file)
+		Source : NYCTaxiLakehouse/NYCTaxi_Yellow/@concat('yellow_tripdata_',variables('v_date'),'.parquet')\
+		Destination : NYCTaxi_Warehouse.staging.NYCTaxi_yellow (existing table)
+
+**Stored Procedure Activity :** \
+SP for removing outlier date\
+Stored Procedure name : NYCTaxi_Warehouse.staging.p_staging_data_cleaning\
+(this Stored procedure is created to clean the data, as we found that there are some outlier date data present in each file)
    
-				CREATE OR ALTER procedure staging.p_staging_data_cleaning
-					@start_date datetime2,
-					@end_date datetime2
-					AS 
+		CREATE OR ALTER procedure staging.p_staging_data_cleaning
+			@start_date datetime2,
+			@end_date datetime2
+			AS 
+		
+			DELETE from staging.NYCTaxi_yellow
+			   where tpep_dropoff_datetime < @start_date or tpep_pickup_datetime > @end_date;
 
-					DELETE from staging.NYCTaxi_yellow
-                       where tpep_dropoff_datetime < @start_date or tpep_pickup_datetime > @end_date;
+**Stored procedure variables:**
+![Stored procedure variables](screenshots/p_staging_data_cleaning_variable.png)
 
-	Stored procedure variables:
-        ![Stored procedure variables](screenshots/p_staging_data_cleaning_variable.png)
-
-   
 		end_date : @addToTime(concat(variables('v_date'),'-01'), 1, 'Month')
 		start_date : @concat(variables('v_date'),'-01')
 
 Before the next step create a new schema and table in NYCTaxi_Warehouse : \
-    schema : metadata  
-    table : processing_log
+    **schema:** metadata  
+    **table:** processing_log
+	
+		create schema metadata;
+		
+		create table metadata.processing_log
+		(
+			pipeline_run_id varchar(255), 
+			table_processed varchar(255), 
+			rows_processed INT, 
+			latest_processed_pickup datetime2(6),
+			processed_datetime datetime2(6)
+		);
 
+**Stored Procedure Activity:** \
+SP for Loading staging metadata
+**Stored Procedure name:** NYCTaxi_Warehouse.metadata.insert_staging_metadata\
+(this Stored procedure is created to create a transaction log for each pipeline run and store staging metadata)
 
-        create schema metadata;
-        
-        create table metadata.processing_log
-        (
-        	pipeline_run_id varchar(255), 
-        	table_processed varchar(255), 
-        	rows_processed INT, 
-        	latest_processed_pickup datetime2(6),
-        	processed_datetime datetime2(6)
-        );
-
-Stored Procedure Activity : SP for Loading staging metadata
-Stored Procedure name : NYCTaxi_Warehouse.metadata.insert_staging_metadata
-(this Stored procedure is created to create a transaction log for each pipeline run
-and store staging metadata)
-	Stored procedure script:
+**Stored procedure script:**
 
     
-				CREATE OR ALTER   PROCEDURE metadata.insert_staging_metadata
-    						@pipeline_run_id VARCHAR(255),
-    						@table_name VARCHAR(255),
-    						@processed_date DATETIME2
-				AS
-				INSERT INTO metadata.processing_log (pipeline_run_id, table_processed, rows_processed,                     latest_processed_pickup, processed_datetime)
-				SELECT
-					@pipeline_run_id AS pipeline_id,
-					@table_name AS table_processed,
-					COUNT(*) AS rows_processed,
-					MAX(tpep_pickup_datetime) AS latest_processed_pickup,
-					@processed_date AS processed_datetime
-				FROM staging.NYCTaxi_yellow;
+		CREATE OR ALTER   PROCEDURE metadata.insert_staging_metadata
+					@pipeline_run_id VARCHAR(255),
+					@table_name VARCHAR(255),
+					@processed_date DATETIME2
+		AS
+		INSERT INTO metadata.processing_log (pipeline_run_id, table_processed, rows_processed, latest_processed_pickup, processed_datetime)
+		SELECT
+			@pipeline_run_id AS pipeline_id,
+			@table_name AS table_processed,
+			COUNT(*) AS rows_processed,
+			MAX(tpep_pickup_datetime) AS latest_processed_pickup,
+			@processed_date AS processed_datetime
+		FROM staging.NYCTaxi_yellow;
 				
-Stored procedure variables: 
+**Stored procedure variables:**
 ![insert_staging_metadata](screenshots/insert_staging_metadata_variable.png)
 
 
@@ -149,8 +155,8 @@ Stored procedure variables:
     processed_date : @pipeline().TriggerTime (Pipeline variable)
     table_name : staging.NYCTaxi_yellow
 					
-Dataflow from staging to presentation:
-	Create Processing Table:
+### **Dataflow from staging to presentation:**
+**Create Processing Table:**
 
     
 		CREATE TABLE dbo.NYCTaxi_yellow
@@ -168,37 +174,38 @@ Dataflow from staging to presentation:
 				total_amount FLOAT
 			);
 			
-**Create a Dataflow Gen 2:**\
+### **Create a Dataflow Gen 2:** \
 Dataflow_pres_processing_NYCTaxi\
-Select NYCTaxi_Warehouse.staging.NYCTaxi_yellow table as data source.\
-Apply some transformation :
+* Select NYCTaxi_Warehouse.staging.NYCTaxi_yellow table as data source.\
+* Apply some transformation :
 1. we will remove these	columns : RatecodeID, staore_and_fwd_flag, fare_amount, extra, mta_tax, tip_amount, tolls_amount, improvement_surcharge, congestion_surcharge, Airport_fee)
 2. Add a new conditional column : Vendor_name
-(for vendor names go to the data source-> Yellow Trips Data
-Dictionary: (https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf) 
-if vendore id is:\
-1 = Creative Mobile Technologies, LLC\
-2 = Curb Mobility, LLC\
-6 = Myle Technologies Inc\
-7 = Helix
-![Vendor_name](screenshots/vendor_name_conditional_column.png) \
-3. Now we can remove the column : vendor_id.
-4. Add a new conditional column : Payment_method\
-(for vendor names go to the data source-> Yellow Trips Data
-Dictionary(https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf) \
-if payment_type is:\
-0 = Flex Fare trip\
-1 = Credit card\
-2 = Cash\
-3 = No charge\
-4 = Dispute\
-5 = Unknown\
-6 = Voided trip\
+   (for vendor names go to the data source-> Yellow Trips Data
+   Dictionary: (https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf)
+   if vendore id is:\
+   - 1 = Creative Mobile Technologies, LLC\
+   - 2 = Curb Mobility, LLC\
+   - 6 = Myle Technologies Inc\
+   - 7 = Helix
+![Vendor_name](screenshots/vendor_name_conditional_column.png)
+
+* Now we can remove the column : vendor_id.
+* Add a new conditional column : Payment_method\
+  (for vendor names go to the data source-> Yellow Trips Data
+  Dictionary(https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf) \
+  if payment_type is:\
+  - 0 = Flex Fare trip
+  - 1 = Credit card
+  - 2 = Cash
+  - 3 = No charge
+  - 4 = Dispute
+  - 5 = Unknown
+  - 6 = Voided trip
 ![Payment_method](screenshots/Payment_method_conditional_column.png) 	
-5. Now we can remove the column : payment_type.
-6. change tpep_pickup_datetime and tpep_dropoff_datetime to contain date only.
-7. change data type of vendor_name, payment_method change the data type to text.
-8. renamed all the columns to be consistant and in lower case.
+* Now we can remove the column : payment_type.
+* change tpep_pickup_datetime and tpep_dropoff_datetime to contain date only.
+* change data type of vendor_name, payment_method change the data type to text.
+* Renamed all the columns to be consistant and in lower case.
    
 Add another data source :  
 NYCTaxi_Warehouse.staging.taxi_zone_lookup.\

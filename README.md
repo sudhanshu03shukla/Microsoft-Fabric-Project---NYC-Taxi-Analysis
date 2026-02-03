@@ -174,18 +174,18 @@ SP for Loading staging metadata
 				total_amount FLOAT
 			);
 			
-### **Create a Dataflow Gen 2:** \
-Dataflow_pres_processing_NYCTaxi\
-* Select NYCTaxi_Warehouse.staging.NYCTaxi_yellow table as data source.\
+### **Create a Dataflow Gen 2:** 
+Dataflow_pres_processing_NYCTaxi
+* Select NYCTaxi_Warehouse.staging.NYCTaxi_yellow table as data source.
 * Apply some transformation :
 1. we will remove these	columns : RatecodeID, staore_and_fwd_flag, fare_amount, extra, mta_tax, tip_amount, tolls_amount, improvement_surcharge, congestion_surcharge, Airport_fee)
 2. Add a new conditional column : Vendor_name
    (for vendor names go to the data source-> Yellow Trips Data
    Dictionary: (https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf)
-   if vendore id is:\
-   - 1 = Creative Mobile Technologies, LLC\
-   - 2 = Curb Mobility, LLC\
-   - 6 = Myle Technologies Inc\
+   if vendore id is:
+   - 1 = Creative Mobile Technologies, LLC
+   - 2 = Curb Mobility, LLC
+   - 6 = Myle Technologies Inc
    - 7 = Helix
 ![Vendor_name](screenshots/vendor_name_conditional_column.png)
 
@@ -193,7 +193,7 @@ Dataflow_pres_processing_NYCTaxi\
 * Add a new conditional column : Payment_method\
   (for vendor names go to the data source-> Yellow Trips Data
   Dictionary(https://www.nyc.gov/assets/tlc/downloads/pdf/data_dictionary_trip_records_yellow.pdf) \
-  if payment_type is:\
+  if payment_type is:
   - 0 = Flex Fare trip
   - 1 = Credit card
   - 2 = Cash
@@ -276,7 +276,7 @@ and select the pipeline : pl_pres_processing_nyctaxi
 
 ### **Semantic modelling and Power BI report:**
 
-**Create new Semantic Model :** NYC_Taxi_Semantic_Model\
+**Create new Semantic Model :** NYC_Taxi_Semantic_Model
 1. add the table : dbo.NYCTaxi_yellow
 2. Now go to workspace-> create one new item -> Report
 3. select a published semantic model : NYC_Taxi_Semantic_Model

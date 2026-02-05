@@ -1,3 +1,5 @@
+![NYC_Taxi_Thumbnail](screenshots/NYC_Taxi_Thumbnail.png)
+
 # **Microsoft-Fabric-Project-NYC-Taxi-Analysis**
 
 ## **Introduction:**
